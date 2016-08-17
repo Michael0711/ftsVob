@@ -82,7 +82,7 @@ class AlgoTrade(object):
                     self.log.error(u'未获取合约交易信息请检查日志TWAP线程终止')
                     return
 
-                for elt in contrace:
+                for elt in contract:
                    #遍历订单
                    of = contract[elt]
                    if of.status != STATUS_ALLTRADED:
