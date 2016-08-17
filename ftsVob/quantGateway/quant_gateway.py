@@ -37,15 +37,17 @@ class VtGateway(object):
     def onTrade(self, trade):
         """成交信息推送"""
         # 通用事件
-        # 特定合约的成交事件
-        pass
+        event = Event(event_type=EVENT_TRADE)
+        event.data = trade
+        self.eventEngine.put(event)
     
     #----------------------------------------------------------------------
     def onOrder(self, order):
         """订单变化推送"""
         # 通用事件
-        # 特定订单编号的事件
-        pass
+        event = Event(event_type=EVENT_ORDER)
+        event.data = order
+        self.eventEngine.put(event)
     
     #----------------------------------------------------------------------
     def onPosition(self, position):

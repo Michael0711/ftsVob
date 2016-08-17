@@ -14,25 +14,32 @@ class AccountInfoEngine(BaseEngine):
         #暂时作为测试数据
         self.source = {}
         self.register()
+        self.query_list = [self.gateway.qryAccount, 
+                           self.gateway.qryPosition, 
+                           self.gateway.qryOrder, 
+                           self.gateway.qryTrade]
         
     def register(self):
         #注册需要的数据推送事件
         self.event_engine.register(EVENT_POSITION, self.get_position)
         self.event_engine.register(EVENT_ACCOUNT, self.get_account)
-        self.event_engine.register(EVENT_TICKET, self.get_quotation)
+        self.event_engine.register(EVENT_TRADE, self.get_trade)
+        self.event_engine.register(EVENT_ORDER, self.get_order)
 
     def get_position(self, event):
         self.source['position'] = event.data
 
     def get_account(self, event):
-        self.source['account'] = json.dumps(event.data.__dict__)
+        self.source['account'] = event.data
+
+    def get_trade(self, event):
+        self.source['trade'] = event.data
     
-    def get_quotation(self, event):
-        self.source['quotation'] = event.data
-        
+    def get_order(self, event):
+        self.source['order'] = event.data
+
     def fetch_quotation(self):
-        #self.gateway.qryAccount()
-        #这里需要延时处理,否则回报会丢弃,建议使用多引擎的方式
-        #self.gateway.qryPosition()
-        self.gateway.subscribe('IF1609')
+        for elt in self.query_list:
+            elt()
+            time.sleep(1)
         return self.source

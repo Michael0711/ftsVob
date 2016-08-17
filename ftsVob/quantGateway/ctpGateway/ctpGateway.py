@@ -133,6 +133,14 @@ class CtpGateway(VtGateway):
         """查询持仓"""
         self.tdApi.qryPosition()
         
+    def qryTrade(self):
+        """查询成交单记录"""
+        self.tdApi.qryTrade()
+
+    def qryOrder(self):
+        """查询报单"""
+        self.tdApi.qryOrder()
+
     #----------------------------------------------------------------------
     def close(self):
         """关闭"""
@@ -374,6 +382,8 @@ class CtpTdApi(TdApi):
         self.symbolSizeDict = {}            # 保存合约代码和合约大小的印射关系
         self.log = log                      # 日志句柄
         self.pos = list()                   # 持仓列表
+        self.order = list()                 # 报单列表
+        self.trade = list()                 # 成交列表
         
     #----------------------------------------------------------------------
     def onFrontConnected(self):
@@ -524,21 +534,58 @@ class CtpTdApi(TdApi):
     
     #----------------------------------------------------------------------
     def onRspQryOrder(self, data, error, n, last):
-        """"""
-        pass
+        """查询报单回报"""
+        order = VtOrderData()
+        order.symbol = data['InstrumentID']
+        order.orderID = data['OrderLocalID']
+        order.direction = data['Direction']
+        order.offset = data['CombOffsetFlag']
+        order.price = data['LimitPrice']
+        order.totalVolume = data['VolumeTotal']
+        order.tradedVolume = data['VolumeTraded']
+        order.status = data['OrderStatus']
+        order.orderTime = data['InsertTime']
+        order.cancelTime = data['CancelTime']
+        if not last:
+            self.order.append(order)
+        else:
+            self.order.append(order)
+            self.gateway.onOrder(self.order)
+            self.order = []
     
     #----------------------------------------------------------------------
     def onRspQryTrade(self, data, error, n, last):
-        """"""
-        pass
-    
+        """查询成交回报"""
+        trade = VtTradeData()
+        trade.symbol = data['InstrumentID']
+        trade.tradeID = data['TradeID']
+        trade.orderID = data['OrderLocalID']
+        trade.direction = data['Direction']
+        trade.offset = data['OffsetFlag']
+        trade.price = data['Price']
+        trade.volume = data['Volume']
+        trade.tradeTime = data['TradeTime']
+        if not last:
+            self.trade.append(trade)
+        else:
+            self.trade.append(trade)
+            self.gateway.onTrade(self.trade)
+            self.trade = []
+
     #----------------------------------------------------------------------
     def onRspQryInvestorPosition(self, data, error, n, last):
         """持仓查询回报"""
+        pos = VtPositionData()
+        pos.symbol = data['InstrumentID']
+        pos.direction = data['PosiDirection']
+        pos.position = data['Position']
+        pos.price = data['SettlementPrice']
+        pos.frozen = data['StrikeFrozen']
+        
         if not last:
-            self.pos.append(data) 
+            self.pos.append(pos) 
         else:
-            self.pos.append(data)
+            self.pos.append(pos)
             self.gateway.onPosition(self.pos)
             self.pos = []
 
@@ -1105,7 +1152,17 @@ class CtpTdApi(TdApi):
         """查询账户"""
         self.reqID += 1
         self.reqQryTradingAccount({}, self.reqID)
-        
+
+    def qryOrder(self):
+       """查询报单"""
+       self.reqID += 1
+       self.reqQryOrder({}, self.reqID)
+
+    def qryTrade(self):
+       """查询成交单"""
+       self.reqID += 1
+       self.reqQryTrade({}, self.reqID)
+       
     #----------------------------------------------------------------------
     def qryPosition(self):
         """查询持仓"""
@@ -1114,6 +1171,8 @@ class CtpTdApi(TdApi):
         req['BrokerID'] = self.brokerID
         req['InvestorID'] = self.userID
         self.reqQryInvestorPosition(req, self.reqID)
+    
+        
         
     #----------------------------------------------------------------------
     def sendOrder(self, orderReq):
