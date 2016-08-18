@@ -1,7 +1,10 @@
 #coding: utf-8
 import datetime
 import time
+import threadpool
+
 from threading import Thread
+from threadpool import ThreadPool 
 from ..quantGateway.quant_constant import *
 from ..quantGateway.quant_gateway import *
 from ..logHandler import DefaultLogHandler
@@ -15,7 +18,7 @@ Engine层和Strategy层只和算法交易层交互
 
 class AlgoTrade(object):
     """算法交易接口"""
-    def __init__(self, gateWay, eventEngine):
+    def __init__(self, gateWay, eventEngine, thread_pool_size=30):
         """Constructor"""
         self.gateway = gateWay
         self.eventengine = eventEngine
@@ -29,6 +32,9 @@ class AlgoTrade(object):
         self.orderinfo = {}
         self.register()
 
+        #建立线程池用来处理小单，默认线程池大小为30
+        self.pool = threadpool.ThreadPool(thread_pool_size)
+
     def twap(self, size, reqobj, price=0, interval=1, maxtimeout=60):
         self.twap_thread = Thread(target=self.twap_callback, args=(size, reqobj, price, interval, maxtimeout))
         self.twap_thread.start()
@@ -36,6 +42,16 @@ class AlgoTrade(object):
     def vwap(self, size, reqobj, price=0, interval=1, maxtimeout=60):
         self.vwap_thread = Thread(target=self.vwap_callback, args=(size, reqobj, price, interval, maxtimeout))
         self.vwap_thread.start()
+
+    def thread_pool_send_order(self, reqobj):
+        if type(reqobj) == list:
+            par = reqobj
+        else:
+            par = list()
+            par.append(reqobj)
+        requests = threadpool.makeRequests(self.gateway.sendOrder, par)
+        [self.pool.putRequest(req) for req in requests]
+        self.pool.wait()
 
     def twap_callback(self, size, reqobj, price, interval, maxtimeout):
         """Time Weighted Average Price
@@ -58,18 +74,20 @@ class AlgoTrade(object):
 
             #获取合约的即时价格
             if reqobj.symbol in self.gateway.tickdata:
-                rb_data = self.gateway.tickdata[reqobj.symbol].tolist()[-1]
-                price = rb_data.bidPrice1
 
                 for i in range(count):
+                    rb_data = self.gateway.tickdata[reqobj.symbol].tolist()[-1]
+                    price = rb_data.bidPrice1
                     if i == count-1:
                         reqobj.volume = (volume - (i+1)*size) 
                         reqobj.price = price
-                        self.gateway.sendOrder(reqobj)
+                        self.thread_pool_send_order(reqobj)
+                        #self.gateway.sendOrder(reqobj)
                     else:
                         reqobj.volume = size
                         reqobj.price = price
-                        self.gateway.sendOrder(reqobj)
+                        self.thread_pool_send_order(reqobj)
+                        #self.gateway.sendOrder(reqobj)
                     time.sleep(interval)
 
                 #检查Order信息表，准备撤单
@@ -114,7 +132,8 @@ class AlgoTrade(object):
             price = rb_data.AskPrice1
             reqobj.price = price
             reqobj.volume = volume
-            self.gateway.sendOrder(reqobj)
+            self.thread_pool_send_order(reqobj)
+            #self.gateway.sendOrder(reqobj)
         
     def get_order_info_callback(self, event):
         if event.data.symbol in orderinfo: 

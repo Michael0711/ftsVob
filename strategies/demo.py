@@ -6,13 +6,6 @@ from ftsVob import  StrategyTemplate
 from ftsVob import  DefaultLogHandler
 from ftsVob import  AlgoTrade
 
-import os
-import time
-import datetime
-import json
-
-SPLITLINE='----------------------------------------------------'
-
 class Strategy(StrategyTemplate):
     name = 'Cta strategy'
 
@@ -26,132 +19,31 @@ class Strategy(StrategyTemplate):
     
     def run(self, event):
         self.log.info(event.data)
-        dnow = datetime.datetime.now()
-        dstr = dnow.strftime('%Y%m%d')
-        filename = self.gateway.tdApi.userID + '.' + dstr
-        
-        if self.is_whole_info(event):
-            self.write2file(event, filename)
-            self.convertdata2dict(event, filename)
-            self.kill_process()
-        else:
-            self.log.info('Pls waiting more time')
+        orderreq = VtOrderReq()
+        orderreq.symbol = 'IF1609'
+        orderreq.volume = 5 
+        orderreq.priceType = PRICETYPE_FOK
+        orderreq.direction = DIRECTION_SHORT
+        orderreq.offset = OFFSET_OPEN
+        self.algo.twap(1, orderreq)
+        """
+        if 'position' in event.data:
+            poslist = event.data['position']
+            for elt in poslist:
+                if elt['PosiDirection'] == '3':
+                    direct = DIRECTION_LONG
+                if elt['PosiDirection'] == '2':
+                    direct = DIRECTION_SHORT
+                offset = OFFSET_CLOSE
+                if elt['Position'] > 0:
+                    req = ReqObj(elt['InstrumentID'], 
+                                 elt['SettlementPrice'],
+                                 elt['Position'],
+                                 PRICETYPE_FOK,
+                                 direct,
+                                 offset)
+                    self.gateway.sendOrder(req)
+                else:
+                    self.log.info('Position volume is zero')
+        """
 
-    def kill_process(self):
-        os.system('sh daemonvt.sh stop')
-
-    def is_whole_info(self, event):
-        data = event.data
-        if ('account' in data and
-            'position' in data and
-            'order' in data and
-            'trade' in data):
-            return True
-        else:
-            return False
-    
-    def write2file(self, event, fname):
-        fp = open(fname, 'w')
-        fp.write(SPLITLINE+'\n')
-        data = event.data['account']
-        fp.write('ACCOUNT:\n')
-        fp.write('prebalance: ' + str(data.preBalance) + '\n')
-        fp.write('available: ' + str(data.available) + '\n')
-        fp.write('commission: ' + str(data.commission) + '\n')
-        fp.write('margin: ' + str(data.margin) + '\n')
-        fp.write('closeprofit: ' + str(data.closeProfit) + '\n')
-        fp.write('positionProfit: ' + str(data.positionProfit) + '\n')
-        fp.write('balance: ' + str(data.balance) + '\n')
-        fp.write(SPLITLINE+'\n')
-
-        fp.write('POSITION:\n')
-        data = event.data['position']
-        ret_table = self.list2readable_table4pos(data)
-        self.write_content(fp, ret_table)
-        fp.write(SPLITLINE+'\n')
-
-        fp.write('ORDER:\n')
-        data = event.data['order']
-        ret_table = self.list2readable_table4order(data)
-        self.write_content(fp, ret_table)
-        fp.write(SPLITLINE+'\n')
-
-        fp.write('TRADE:\n')
-        data = event.data['trade']
-        ret_table = self.list2readable_table4trade(data)
-        self.write_content(fp, ret_table)
-        fp.write(SPLITLINE+'\n')
-        fp.close()
-
-    def convertdata2dict(self, event, fname):
-        ret = dict()
-        ret['account'] = event.data['account'].__dict__
-        ret['position'] = list()
-        ret['order'] = list()
-        ret['trade'] = list()
-        for elt in event.data['position']:
-            ret['position'].append(elt.__dict__)
-        for elt in event.data['order']:
-            ret['order'].append(elt.__dict__)
-        for elt in event.data['trade']:
-            ret['trade'].append(elt.__dict__)
-        retstr = json.dumps(ret)
-        with open(fname+'.serial', 'w') as f:
-            f.write(retstr)
-
-    def list2readable_table4pos(self, data):
-        ret = dict()
-        for elt in data:
-            self.add_element(ret, 'symbol', elt.symbol)
-            self.add_element(ret, 'direction', elt.direction)
-            self.add_element(ret, 'position', elt.position)
-            self.add_element(ret, 'price', elt.price)
-            self.add_element(ret, 'frozen', elt.frozen)
-        return ret
-
-    def list2readable_table4order(self, data):
-        ret = dict()
-        for elt in data:
-            self.add_element(ret, 'symbol', elt.symbol)
-            self.add_element(ret, 'orderID', elt.orderID)
-            self.add_element(ret, 'direction', elt.direction)
-            self.add_element(ret, 'offset', elt.offset)
-            self.add_element(ret, 'price', elt.price)
-            self.add_element(ret, 'totalVolume', elt.totalVolume)
-            self.add_element(ret, 'tradedVolume', elt.tradedVolume)
-            self.add_element(ret, 'status', elt.status)
-            self.add_element(ret, 'orderTime', elt.orderTime)
-            self.add_element(ret, 'cancelTime', elt.cancelTime)
-        return ret
-        
-    def list2readable_table4trade(self, data):
-        ret = dict()
-        for elt in data:
-            self.add_element(ret, 'symbol', elt.symbol)
-            self.add_element(ret, 'tradeID', elt.tradeID)
-            self.add_element(ret, 'orderID', elt.orderID)
-            self.add_element(ret, 'direction', elt.direction)
-            self.add_element(ret, 'offset', elt.offset)
-            self.add_element(ret, 'price', elt.price)
-            self.add_element(ret, 'volume', elt.volume)
-            self.add_element(ret, 'tradeTime', elt.tradeTime)
-        return ret
-
-    def write_content(self, fp, ret):
-        itemlist = sorted(ret.keys())
-        for ki in itemlist:
-            fp.write(ki+'\t\t')
-        fp.write('\n')
-        for ki in range(len(ret[itemlist[0]])):
-            for kj in itemlist:
-                fp.write(str(ret[kj][ki]) + '\t\t')
-            fp.write('\n')
-        
-    def add_element(self, d, key, v):
-        if key not in d:
-            d[key] = list()
-            d[key].append(v)
-        else:
-            d[key].append(v)
-        return d
-            
