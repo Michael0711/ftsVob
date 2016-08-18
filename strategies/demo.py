@@ -9,6 +9,7 @@ from ftsVob import  AlgoTrade
 import os
 import time
 import datetime
+import json
 
 SPLITLINE='----------------------------------------------------'
 
@@ -25,8 +26,13 @@ class Strategy(StrategyTemplate):
     
     def run(self, event):
         self.log.info(event.data)
+        dnow = datetime.datetime.now()
+        dstr = dnow.strftime('%Y%m%d')
+        filename = self.gateway.tdApi.userID + '.' + dstr
+        
         if self.is_whole_info(event):
-            self.write2file(event)
+            self.write2file(event, filename)
+            self.convertdata2dict(event, filename)
             self.kill_process()
         else:
             self.log.info('Pls waiting more time')
@@ -44,11 +50,8 @@ class Strategy(StrategyTemplate):
         else:
             return False
     
-    def write2file(self, event):
-        dnow = datetime.datetime.now()
-        dstr = dnow.strftime('%Y%m%d')
-        filename = self.gateway.tdApi.userID + '.' + dstr  
-        fp = open(filename, 'w')
+    def write2file(self, event, fname):
+        fp = open(fname, 'w')
         fp.write(SPLITLINE+'\n')
         data = event.data['account']
         fp.write('ACCOUNT:\n')
@@ -79,6 +82,22 @@ class Strategy(StrategyTemplate):
         self.write_content(fp, ret_table)
         fp.write(SPLITLINE+'\n')
         fp.close()
+
+    def convertdata2dict(self, event, fname):
+        ret = dict()
+        ret['account'] = event.data['account'].__dict__
+        ret['position'] = list()
+        ret['order'] = list()
+        ret['trade'] = list()
+        for elt in event.data['position']:
+            ret['position'].append(elt.__dict__)
+        for elt in event.data['order']:
+            ret['order'].append(elt.__dict__)
+        for elt in event.data['trade']:
+            ret['trade'].append(elt.__dict__)
+        retstr = json.dumps(ret)
+        with open(fname+'.serial', 'w') as f:
+            f.write(retstr)
 
     def list2readable_table4pos(self, data):
         ret = dict()
