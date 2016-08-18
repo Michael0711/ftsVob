@@ -18,7 +18,11 @@ class ErrorHandler(object):
     def process_error(self, event):
         """注册函数"""
         err = event.data
-        self.value_call.get(err.errorID)(event)
+        if err.errorID not in self.value_call:
+            self.log.info(err.errorID)
+            self.log.info(err.errorMsg)
+        else:
+            self.value_call.get(err.errorID)(event)
 
     def err_lack_capital(self, event):
         self.log.info(event.data.errorMsg)

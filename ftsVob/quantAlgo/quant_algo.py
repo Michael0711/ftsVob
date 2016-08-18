@@ -74,7 +74,6 @@ class AlgoTrade(object):
 
             #获取合约的即时价格
             if reqobj.symbol in self.gateway.tickdata:
-
                 for i in range(count):
                     rb_data = self.gateway.tickdata[reqobj.symbol].tolist()[-1]
                     price = rb_data.bidPrice1
@@ -100,10 +99,13 @@ class AlgoTrade(object):
                     self.log.error(u'未获取合约交易信息请检查日志TWAP线程终止')
                     return
 
+                #记录撤单次数，撤单次数乘以size等于volume
+                cancel_cnt = 0 
+
                 for elt in contract:
                    #遍历订单
                    of = contract[elt]
-                   if of.status != STATUS_ALLTRADED:
+                   if of.status == STATUS_NOTTRADED: 
                        cancel_obj = VtCancelOrderReq()
                        cancel_obj.symbol = of.symbol
                        cancel_obj.exchange = of.exchange
@@ -111,8 +113,9 @@ class AlgoTrade(object):
                        cancel_obj.frontID = of.frontID
                        cancel_obj.sessionID = of.sessionID
                        self.gateway.cancelOrder(cancel_obj)
-                       remain_volume += (of.totalVolume - of.tradedVolume)
+                       cancel_cnt += 1
 
+                remain_volume = cancel_cnt * size
                 if remain_volume == 0:
                     status_send_order['success'] = True
                     status_send_order['timeout'] = False
@@ -136,11 +139,11 @@ class AlgoTrade(object):
             #self.gateway.sendOrder(reqobj)
         
     def get_order_info_callback(self, event):
-        if event.data.symbol in orderinfo: 
-            orderinfo[event.data.symbol][event.data.orderID] = event.data
+        if event.data.symbol in self.orderinfo: 
+            self.orderinfo[event.data.symbol][event.data.orderID] = event.data
         else:
-            orderinfo[event.data.symbol] = dict()
-            orderinfo[event.data.symbol][event.data.orderID] = event.data
+            self.orderinfo[event.data.symbol] = dict()
+            self.orderinfo[event.data.symbol][event.data.orderID] = event.data
 
     def get_trade_info_callback(self, event):
         tradeinfo = event.data
