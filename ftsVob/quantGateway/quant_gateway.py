@@ -248,15 +248,19 @@ class VtOrderData(VtBaseData):
         self.price = EMPTY_FLOAT                # 报单价格
         self.totalVolume = EMPTY_INT            # 报单总数量
         self.tradedVolume = EMPTY_INT           # 报单成交数量
+        self.remainVolume = EMPTY_INT           # 报单剩余数量
         self.status = EMPTY_UNICODE             # 报单状态
         
         self.orderTime = EMPTY_STRING           # 发单时间
         self.cancelTime = EMPTY_STRING          # 撤单时间
+        self.requestID = EMPTY_STRING           # 请求序号
         
         # CTP/LTS相关
         self.frontID = EMPTY_INT                # 前置机编号
         self.sessionID = EMPTY_INT              # 连接编号
 
+        
+       
 class VtTradeData(VtBaseData):
     """成交数据类"""
 

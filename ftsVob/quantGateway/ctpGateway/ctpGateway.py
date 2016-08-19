@@ -541,11 +541,14 @@ class CtpTdApi(TdApi):
         order.direction = data['Direction']
         order.offset = data['CombOffsetFlag']
         order.price = data['LimitPrice']
-        order.totalVolume = data['VolumeTotal']
+        order.totalVolume = data['VolumeTotalOriginal']
         order.tradedVolume = data['VolumeTraded']
+        order.remainVolume = data['VolumeTotal']
         order.status = data['OrderStatus']
         order.orderTime = data['InsertTime']
         order.cancelTime = data['CancelTime']
+        order.requestID = data['RequestID']
+
         if not last:
             self.order.append(order)
         else:
@@ -855,6 +858,7 @@ class CtpTdApi(TdApi):
         order.cancelTime = data['CancelTime']
         order.frontID = data['FrontID']
         order.sessionID = data['SessionID']
+        order.requestID = data['RequestID'] 
         
         # CTP的报单号一致性维护需要基于frontID, sessionID, orderID三个字段
         # 但在本接口设计中，已经考虑了CTP的OrderRef的自增性，避免重复
@@ -1216,9 +1220,8 @@ class CtpTdApi(TdApi):
         
         self.reqOrderInsert(req, self.reqID)
         
-        # 返回订单号（字符串），便于某些算法进行动态管理
-        vtOrderID = '.'.join([self.gatewayName, str(self.orderRef)])
-        return vtOrderID
+        # 返回请求号
+        return self.orderRef
     
     #----------------------------------------------------------------------
     def cancelOrder(self, cancelOrderReq):
