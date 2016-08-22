@@ -1,0 +1,13 @@
+{
+    "rb1610":
+    {
+        "volume":5,
+        "size":1,
+        "priceType":"PRICETYPE_FOK",
+        "direction":"DIRECTION_SHORT",
+        "offset":"OFFSET_OPEN",
+        "sinterval":5,
+        "mwtime":60,
+        "wttime":2
+    }
+}

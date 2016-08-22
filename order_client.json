@@ -1,0 +1,9 @@
+{
+   "port": 12345,
+   "ip": "127.0.0.1",
+   "name": "order_client",
+   "readtimeout": 0.2,
+   "writetimeout": 0.2,
+   "connecttimeout": 0.2,
+   "conntype": 0
+}

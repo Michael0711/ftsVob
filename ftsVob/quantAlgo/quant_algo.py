@@ -88,7 +88,7 @@ class AlgoTrade(object):
              self.gateway.cancelOrder(cancel_obj)
              #计算剩余单数
              remain_v += of.remainVolume
-             self.volume -= of.tradedVolume
+        self.volume -= of.tradedVolume
 
         #启动发单子进程 
         if remain_v > 0:
@@ -112,7 +112,7 @@ class AlgoTrade(object):
 
         for i in range(count):
             if i == count - 1:
-                reqobj.volume = (volume - (i+1)*size) 
+                reqobj.volume = (volume - i*size) 
                 self.send_small_order(reqobj, wttime)
             else:
                 reqobj.volume = size
@@ -124,10 +124,10 @@ class AlgoTrade(object):
         #剩余单数以对手价格下单
         if self.volume > 0:
             rb_data = self.gateway.tickdata[reqobj.symbol].tolist()[-1]
-            price = rb_data.AskPrice1
+            price = rb_data.askPrice1
             reqobj.price = price
             reqobj.volume = volume
-            self.gateway.sendOrder(req)
+            self.gateway.sendOrder(reqobj)
         
     def get_order_info_callback(self, event):
 
@@ -137,7 +137,7 @@ class AlgoTrade(object):
         else:
             self.orderinfo[event.data.symbol] = dict()
             self.orderinfo[event.data.symbol][event.data.orderID] = event.data
-
+         
         #建立request反查字典
         self.request[event.data.orderID] = event.data
 

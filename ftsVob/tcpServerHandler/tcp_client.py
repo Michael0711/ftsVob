@@ -10,17 +10,23 @@ class FtsTcpClient(object):
         FtsTcpServer的构造函数负责初始化一些客户端属性
         @cfg: 字典型配置文件
         """
-        self.port = int(cfg.get("port",12345))
-        self.ip = cfg.get("ip","127.0.0.1")
-        self.name = cfg.get("name","base_driver")
-        self.rdtmout = cfg.get("readtimeout",0.2)
-        self.wrtmout = cfg.get("writetimeout",0.2)
-        self.cntmout = cfg.get("connecttimeout",0.2)
-        self.conntype = cfg.get("conntype",0)
+        f = file(cfg)
+        setting = json.load(f)
+        self.port = int(setting['port'])
+        self.ip = setting['ip']
+        self.name = setting['name']
+        self.rdtmout = setting['readtimeout']
+        self.wrtmout = setting['writetimeout']
+        self.cntmout = setting['connecttimeout']
+        self.conntype = setting['conntype']
         self.net = FtsClientNetLib(self)
 
     def doRequest(self):
-        self.net.invite()
+        self.net.invite(self.orderobj)
+
+    def setRequest(self, path):
+        f = file(path)
+        self.orderobj = json.load(f)
 
 class FtsClientNetLib():
     
@@ -61,7 +67,7 @@ class FtsClientNetLib():
         self.sockcond.notify()
         self.sockcond.release()
 
-    def invite(self):
+    def invite(self, send_order):
         #获取端口
         sock = self.__get_socket()
         if not sock:
@@ -69,7 +75,7 @@ class FtsClientNetLib():
             return
         try:
             #发送请求
-            reqRawData = json.dumps({'euxyacg':1})
+            reqRawData = json.dumps(send_order)
             sent = 0
             sock.settimeout(self.driver.wrtmout)
             while sent < len(reqRawData):
@@ -87,7 +93,8 @@ class FtsClientNetLib():
             self.__put_socket(None)
 
 def main():
-    driver = FtsTcpClient({'name':'test', 'port':'12345'})
+    driver = FtsTcpClient('order_client.json')
+    driver.setRequest('order_list.json')
     driver.doRequest()
 
 if __name__ == '__main__':

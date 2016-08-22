@@ -1,0 +1,9 @@
+{
+   "port": 12345,
+   "name": "order_server",
+   "readtimeout": 0.2,
+   "writetimeout": 0.2,
+   "conntype": 0,
+   "threadnum": 1,
+   "queuesize": 2
+}

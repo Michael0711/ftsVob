@@ -3,27 +3,32 @@ import time
 import json
 import socket,threading,asyncore
 
-#from ..logHandler import DefaultLogHandler
+from ..logHandler import DefaultLogHandler
 
 RECVDATASIZE = 1024
 
 class FtsTcpServer(object):
     
-    def __init__(self, cfg):
+    def __init__(self, cfg, gateway, eventengine):
         """
         FtsTcpServer的构造函数负责初始化一些服务器属性
         @cfg: 字典型配置文件
         """
-        self.port = int(cfg.get("port",23456))
-        self.name = cfg.get("name","base_stub")
-        self.rdtmout = cfg.get("readtimeout",0.2)
-        self.wrtmout = cfg.get("writetimeout",0.2)
-        self.conntype = cfg.get("conntype",0)
-        self.threadnum = cfg.get("threadnum",1)
-        self.queuesize = cfg.get("queuesize",2)
+        f = file(cfg)
+        setting = json.load(f)
+        self.port = int(setting['port'])
+        self.name = setting['name']
+        self.rdtmout = setting['readtimeout']
+        self.wrtmout = setting['writetimeout']
+        self.conntype = setting['conntype']
+        self.threadnum = setting['threadnum']
+        self.queuesize = setting['queuesize']
 
         self.net = FtsServerNetLib(self)
+        self.gateway = gateway
+        self.eventengine = eventengine
         self.callback = None
+        self.sendlist = {}
 
     def setCallback(self, cb):
         self.callback = cb
@@ -60,7 +65,7 @@ class FtsServerNetLib(asyncore.dispatcher):
         self.twork = []
         self.connections = []
         self.__lock = threading.Lock()
-        #self.log = DefaultLogHandler(name=__name__)
+        self.log = DefaultLogHandler(name=__name__)
 
     def start(self):
         self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -99,7 +104,7 @@ class FtsServerNetLib(asyncore.dispatcher):
                 #设置读取超时时间
                 sock.settimeout(self.server.rdtmout)
                 recvRaw = sock.recv(RECVDATASIZE)
-                print(recvRaw)
+                self.server.sendlist = json.loads(recvRaw)
 
                 #调用服务器的回调函数，这里可以设置TWAP函数
                 if self.server.callback:
@@ -110,7 +115,8 @@ class FtsServerNetLib(asyncore.dispatcher):
 
                 #返回客户端Resp数据，这里可以是TWAP的返回值
                 sock.settimeout(self.server.wrtmout)
-                sendRawData = rspdata
+                #返回数据用Json格式，需要转成字符
+                sendRawData = json.dumps(rspdata)
                 sent = 0
                 while sent < len(sendRawData):
                     sent += sock.send(sendRawData)
@@ -122,8 +128,7 @@ class FtsServerNetLib(asyncore.dispatcher):
                 self.__lock.release()
             except socket.error, why:
                 self.__lock.release()
-                #self.log.warning('socket[%d] %s', conn[0].filno(), why)
-                print('socket[%d] %s', conn[0].filno(), why)
+                self.log.warning('socket[%d] %s', conn[0].filno(), why)
                 conn[0].close()
                 
 
@@ -131,12 +136,10 @@ class FtsServerNetLib(asyncore.dispatcher):
         try:
             conn = self.accept()
         except socket.error:
-            #self.log.warning("server accept() threw an exception")
-            print("server accept() threw an exception")
+            self.log.warning("server accept() threw an exception")
             return
         except TypeError:
-            #self.log.warning("stub accept() threw EWOULDBLOCK")
-            print("stub accept() threw EWOULDBLOCK")
+            self.log.warning("stub accept() threw EWOULDBLOCK")
             return
         if conn: self.__put_conn(conn)
 
