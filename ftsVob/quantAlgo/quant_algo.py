@@ -2,6 +2,7 @@
 import datetime
 import time
 import threadpool
+import json
 
 from threading import Thread
 from threadpool import ThreadPool 
@@ -69,11 +70,11 @@ class AlgoTrade(object):
         @wttime: 等待成交时间
         """
         remain_v = 0
-        price = self.gateway.tickdata[reqobj.symbol].tolist()[-1].bidPrice1 
+        reqobj.price = self.gateway.tickdata[reqobj.symbol].tolist()[-1].bidPrice1 
         order_ref = self.gateway.sendOrder(reqobj)
         time.sleep(wttime)
         try:
-            of = self.request[order_ref]
+            of = self.request[str(order_ref)]
         except KeyError: 
             self.log.error(u'未获取合约交易信息请检查日志发单子线程终止')
             return

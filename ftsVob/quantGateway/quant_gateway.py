@@ -399,6 +399,7 @@ class RingBuffer(object):
             self.cur = 0
             #当队列满时将self的类从非满改为满
             self.__class__ = self.__Full
+
     def tolist(self):
         """ Return a list of elements from the oldest to the newest. """
         return self.data
