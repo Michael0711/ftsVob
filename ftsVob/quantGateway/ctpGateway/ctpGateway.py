@@ -114,6 +114,13 @@ class CtpGateway(VtGateway):
         self.mdApi.subscribe(reqobj)
         
     #----------------------------------------------------------------------
+    def subscribePrivateTopic(self, ntype):
+        """控制私有流的连接方式
+        @ntype: 0:restart,1:resume,2:quick
+        """
+        self.tdApi.subscribePrivateTopic(ntype)
+
+    #----------------------------------------------------------------------
     def sendOrder(self, orderReq):
         """发单"""
         return self.tdApi.sendOrder(orderReq)
@@ -854,6 +861,7 @@ class CtpTdApi(TdApi):
         order.price = data['LimitPrice']
         order.totalVolume = data['VolumeTotalOriginal']
         order.tradedVolume = data['VolumeTraded']
+        order.remainVolume = data['VolumeTotal']
         order.orderTime = data['InsertTime']
         order.cancelTime = data['CancelTime']
         order.frontID = data['FrontID']

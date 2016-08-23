@@ -59,6 +59,8 @@ def main():
     event_engine = ftsVob.quantEngine.EventEngine()
     gateway = ftsVob.quantGateway.Use(gatewayname, gatewayConf=gatewayconfig, eventEngine=event_engine, log=ftsVob.logHandler.DefaultLogHandler(name=__name__)) 
     gateway.connect()
+    gateway.subscribePrivateTopic(1)
+    
     event_engine.start()
     
     #输出程序pid

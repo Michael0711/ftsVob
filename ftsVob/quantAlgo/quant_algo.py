@@ -70,8 +70,10 @@ class AlgoTrade(object):
         @wttime: 等待成交时间
         """
         remain_v = 0
-        reqobj.price = self.gateway.tickdata[reqobj.symbol].tolist()[-1].bidPrice1 
+        reqobj.price = round(self.gateway.tickdata[reqobj.symbol].tolist()[-1].bidPrice1, 1)
         order_ref = self.gateway.sendOrder(reqobj)
+        self.log.info('------------------------sendinfo-------------------')
+        self.log.info(json.dumps(reqobj.__dict__))
         time.sleep(wttime)
         try:
             of = self.request[str(order_ref)]
@@ -79,22 +81,31 @@ class AlgoTrade(object):
             self.log.error(u'未获取合约交易信息请检查日志发单子线程终止')
             return
 
-        if of.status == STATUS_NOTTRADED: 
-             cancel_obj = VtCancelOrderReq()
-             cancel_obj.symbol = of.symbol
-             cancel_obj.exchange = of.exchange
-             cancel_obj.orderID = of.orderID
-             cancel_obj.frontID = of.frontID
-             cancel_obj.sessionID = of.sessionID
-             self.gateway.cancelOrder(cancel_obj)
-             #计算剩余单数
-             remain_v += of.remainVolume
-        self.volume -= of.tradedVolume
-
-        #启动发单子进程 
-        if remain_v > 0:
-            reqobj.volume = remain_v
-            self.send_child_order(reqobj, wttime)
+        if of.status == STATUS_NOTTRADED or of.status == STATUS_PARTTRADED: 
+            cancel_obj = VtCancelOrderReq()
+            cancel_obj.symbol = of.symbol
+            cancel_obj.exchange = of.exchange
+            cancel_obj.orderID = of.orderID
+            cancel_obj.frontID = of.frontID
+            cancel_obj.sessionID = of.sessionID
+            self.gateway.cancelOrder(cancel_obj)
+        
+        time.sleep(1)
+        #检查撤单状态决定是否需要重新发单
+        try:
+            of = self.request[str(order_ref)]
+        except KeyError: 
+            self.log.error(u'未获取撤单之后合约交易信息子线程终止')
+            return
+        if of.status == STATUS_CANCELLED:
+            #计算剩余单数
+            remain_v += of.remainVolume
+            self.log.info('----------------cancelled-----------')
+            self.log.info(remain_v)
+            #启动发单子进程 
+            if remain_v > 0:
+                reqobj.volume = remain_v
+                self.send_child_order(reqobj, wttime)
         return
              
     def twap_callback(self, size, reqobj, price, sinterval, mwtime, wttime):
@@ -126,9 +137,9 @@ class AlgoTrade(object):
         #剩余单数以对手价格下单
         if self.volume > 0:
             rb_data = self.gateway.tickdata[reqobj.symbol].tolist()[-1]
-            price = rb_data.askPrice1
+            price = round(rb_data.askPrice1, 1)
             reqobj.price = price
-            reqobj.volume = volume
+            reqobj.volume = self.volume
             self.gateway.sendOrder(reqobj)
         
     def get_order_info_callback(self, event):
@@ -146,6 +157,11 @@ class AlgoTrade(object):
     def get_trade_info_callback(self, event):
         tradeinfo = event.data
         self.orderinfo[tradeinfo.symbol][tradeinfo.orderID].status = STATUS_ALLTRADED
+
+        #收到成交回报更新总单数
+        self.volume -= tradeinfo.volume
+        self.log.info('----------------------------success----------------')
+        self.log.info(self.volume)
 
     def register(self):
         self.eventengine.register(EVENT_TRADE, self.get_trade_info_callback)
