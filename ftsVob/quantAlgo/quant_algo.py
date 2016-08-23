@@ -57,7 +57,7 @@ class AlgoTrade(object):
         self.vwap_thread = Thread(target=self.vwap_callback, args=(size, reqobj, price, sinterval, mwtime, wttime))
         self.vwap_thread.start()
 
-    def send_small_order(self, reqobj, wttime): 
+    def send_child_order(self, reqobj, wttime): 
         par = list()
         par.append(([reqobj,wttime],{}))
         requests = threadpool.makeRequests(self.process_child, par)
@@ -92,7 +92,8 @@ class AlgoTrade(object):
 
         #启动发单子进程 
         if remain_v > 0:
-            self.send_small_order(reqobj, wttime)
+            reqobj.volume = remain_v
+            self.send_child_order(reqobj, wttime)
         return
              
     def twap_callback(self, size, reqobj, price, sinterval, mwtime, wttime):
@@ -113,10 +114,10 @@ class AlgoTrade(object):
         for i in range(count):
             if i == count - 1:
                 reqobj.volume = (volume - i*size) 
-                self.send_small_order(reqobj, wttime)
+                self.send_child_order(reqobj, wttime)
             else:
                 reqobj.volume = size
-                self.send_small_order(reqobj, wttime)
+                self.send_child_order(reqobj, wttime)
             time.sleep(sinterval)
         self.pool.wait()
         #最大等待时间
