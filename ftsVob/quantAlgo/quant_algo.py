@@ -39,6 +39,9 @@ class AlgoTrade(object):
 
         #建立线程池用来处理小单，默认线程池大小为30
         self.pool = threadpool.ThreadPool(thread_pool_size)
+        
+        #返回给客户端数据(在网络交易模式下)
+        self.ret_client_data = {}
 
     def twap(self, size, reqobj, price=0, sinterval=1, mwtime=60, wttime=2):
         """TWAP对外接口
@@ -64,6 +67,39 @@ class AlgoTrade(object):
         requests = threadpool.makeRequests(self.process_child, par)
         [self.pool.putRequest(req) for req in requests]
         
+    def process_cancel(self, reqobj, wttime, order_ref):
+        """处理撤单逻辑
+        """
+        max_cancel_cnt = 3
+        while True:
+            try:
+                of = self.request[str(order_ref)]
+                if of.status == STATUS_NOTTRADED or of.status == STATUS_PARTTRADED: 
+                    cancel_obj = VtCancelOrderReq()
+                    cancel_obj.symbol = of.symbol
+                    cancel_obj.exchange = of.exchange
+                    cancel_obj.orderID = of.orderID
+                    cancel_obj.frontID = of.frontID
+                    cancel_obj.sessionID = of.sessionID
+                    self.gateway.cancelOrder(cancel_obj)
+                if of.status == STATUS_CANCELLED:
+                    #计算剩余单数
+                    remain_v += of.remainVolume
+                    self.log.info('----------------cancelled-----------')
+                    self.log.info(remain_v)
+                    #启动发单子进程 
+                    if remain_v > 0:
+                        reqobj.volume = remain_v
+                        self.send_child_order(reqobj, wttime)
+                        break
+            except KeyError: 
+                self.log.error(u'未获取合约交易信息尝试三次以后子线程终止')
+            finally:
+                max_cancel_cnt -= 1
+                if max_cancel_cnt == 0:
+                    break
+
+
     def process_child(self, reqobj, wttime):
         """发单子线程
         @reqobj: 发单请求
@@ -75,37 +111,7 @@ class AlgoTrade(object):
         self.log.info('------------------------sendinfo-------------------')
         self.log.info(json.dumps(reqobj.__dict__))
         time.sleep(wttime)
-        try:
-            of = self.request[str(order_ref)]
-        except KeyError: 
-            self.log.error(u'未获取合约交易信息请检查日志发单子线程终止')
-            return
-
-        if of.status == STATUS_NOTTRADED or of.status == STATUS_PARTTRADED: 
-            cancel_obj = VtCancelOrderReq()
-            cancel_obj.symbol = of.symbol
-            cancel_obj.exchange = of.exchange
-            cancel_obj.orderID = of.orderID
-            cancel_obj.frontID = of.frontID
-            cancel_obj.sessionID = of.sessionID
-            self.gateway.cancelOrder(cancel_obj)
-        
-        time.sleep(1)
-        #检查撤单状态决定是否需要重新发单
-        try:
-            of = self.request[str(order_ref)]
-        except KeyError: 
-            self.log.error(u'未获取撤单之后合约交易信息子线程终止')
-            return
-        if of.status == STATUS_CANCELLED:
-            #计算剩余单数
-            remain_v += of.remainVolume
-            self.log.info('----------------cancelled-----------')
-            self.log.info(remain_v)
-            #启动发单子进程 
-            if remain_v > 0:
-                reqobj.volume = remain_v
-                self.send_child_order(reqobj, wttime)
+        self.process_cancel(reqobj, wttime, order_ref)  
         return
              
     def twap_callback(self, size, reqobj, price, sinterval, mwtime, wttime):
@@ -141,9 +147,9 @@ class AlgoTrade(object):
             reqobj.price = price
             reqobj.volume = self.volume
             self.gateway.sendOrder(reqobj)
+        return
         
     def get_order_info_callback(self, event):
-
         #建立orderinfo二级字典
         if event.data.symbol in self.orderinfo: 
             self.orderinfo[event.data.symbol][event.data.orderID] = event.data
@@ -162,6 +168,11 @@ class AlgoTrade(object):
         self.volume -= tradeinfo.volume
         self.log.info('----------------------------success----------------')
         self.log.info(self.volume)
+        if 'tradeinfo' not in self.ret_client_data:
+            self.ret_client_data['tradeinfo'] = list()
+            self.ret_client_data['tradeinfo'].append(tradeinfo.__dict__)
+        else:
+            self.ret_client_data['tradeinfo'].append(tradeinfo.__dict__)
 
     def register(self):
         self.eventengine.register(EVENT_TRADE, self.get_trade_info_callback)

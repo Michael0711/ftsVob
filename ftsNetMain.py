@@ -2,6 +2,8 @@
 
 import os
 import ftsVob
+import time
+import json
 
 def send_order_call_back(ftsserver):
     """下单的回调函数"""
@@ -22,6 +24,11 @@ def send_order_call_back(ftsserver):
         #这里需要转码utf-8
         orderreq.symbol = elt.encode('utf-8')
         algo.twap(size, orderreq, sinterval=t1, mwtime=t2, wttime=t3)
+
+    #等待最长时间获取返回
+    time.sleep(t2)
+    return json.dumps(algo.ret_client_data)
+    
 
 def convert_order2reqobj(elt):
     """客户端发过来的数据需要转成真实的下单""" 
