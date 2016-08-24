@@ -105,12 +105,10 @@ class FtsServerNetLib(asyncore.dispatcher):
                 self.__lock.acquire()
                 sock,addr = conn
                 
-                self.log.info(conn)
                 #接收数据
                 #设置读取超时时间
                 sock.settimeout(self.server.rdtmout)
                 recvRaw = sock.recv(RECVDATASIZE)
-                self.log.info(recvRaw)
                 self.server.sendlist = json.loads(recvRaw)
 
                 #建立客户端映射
@@ -131,17 +129,12 @@ class FtsServerNetLib(asyncore.dispatcher):
                 sent = 0
                 while sent < len(sendRawData):
                     sent += sock.send(sendRawData)
-
                 if self.server.conntype:
-                    self.log.info('euxyacg conntype:%d' % self.server.conntype)
                     self.__put_conn(conn)
-                else:
-                    self.log.info('euxyacg conntype:%d' % self.server.conntype)
-                    #conn[0].close()
                 self.__lock.release()
             except socket.error, why:
                 self.__lock.release()
-                self.log.warning('socket[%d] %s', conn[0].filno(), why)
+                self.log.warn('socket %s', why)
                 conn[0].close()
                 
 
@@ -178,11 +171,10 @@ class FtsServerNetLib(asyncore.dispatcher):
         事件回调函数发送回报消息给特定客户端
         """
         data = event.data
-        self.log.info(self.connmap[data.keys()[0]])
         sock,addr = self.connmap[data.keys()[0]]
         send = 0
         msg = data.values()[0]
-        self.log.info('euxyacg')
+        self.log.info('TRADED INFO RESP')
         self.log.info(msg)
         while send < len(msg):
             send += sock.send(msg)
