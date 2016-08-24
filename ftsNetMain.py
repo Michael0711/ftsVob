@@ -9,7 +9,7 @@ def send_order_call_back(ftsserver):
     """下单的回调函数"""
     #根据下单合约首先订阅
     for elt in ftsserver.sendlist:
-        ftsserver.gateway.subscribe(elt) 
+        ftsserver.gateway.subscribe(elt.encode('utf-8')) 
 
     #调用Algo下单
     algo = ftsVob.AlgoTrade(ftsserver.gateway, ftsserver.eventengine)
@@ -46,9 +46,12 @@ def convert_order2reqobj(elt):
         ret_order_obj.direction = ftsVob.DIRECTION_LONG
     else:
         ret_order_obj.direction = ftsVob.DIRECTION_SHORT
-
+    
+    #平仓区分平今和平昨
     if elt['offset'] == 'OFFSET_OPEN':
         ret_order_obj.offset = ftsVob.OFFSET_OPEN
+    elif elt['offset'] == 'OFFSET_CLOSETODAY':
+        ret_order_obj.offset = ftsVob.OFFSET_CLOSETODAY
     else:
         ret_order_obj.offset = ftsVob.OFFSET_CLOSE
 

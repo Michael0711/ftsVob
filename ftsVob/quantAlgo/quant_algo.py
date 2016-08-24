@@ -17,6 +17,8 @@ GateWay的上层封装
 Engine层和Strategy层只和算法交易层交互
 """
 
+CUTOFF='-------------------%s'
+
 class AlgoTrade(object):
     """算法交易接口"""
     def __init__(self, gateWay, eventEngine, thread_pool_size=30):
@@ -71,6 +73,7 @@ class AlgoTrade(object):
         """处理撤单逻辑
         """
         max_cancel_cnt = 3
+        remain_v = 0
         while True:
             try:
                 of = self.request[str(order_ref)]
@@ -81,17 +84,18 @@ class AlgoTrade(object):
                     cancel_obj.orderID = of.orderID
                     cancel_obj.frontID = of.frontID
                     cancel_obj.sessionID = of.sessionID
+                    self.log.info(CUTOFF % 'ORDER WILL BE CANCELLED')
+                    self.log.info(json.dumps(cancel_obj.__dict__))
                     self.gateway.cancelOrder(cancel_obj)
                 if of.status == STATUS_CANCELLED:
                     #计算剩余单数
                     remain_v += of.remainVolume
-                    self.log.info('----------------cancelled-----------')
-                    self.log.info(remain_v)
+                    self.log.info(CUTOFF % 'ORDER CANCELLED REMAIN:' + str(remain_v))
                     #启动发单子进程 
                     if remain_v > 0:
                         reqobj.volume = remain_v
                         self.send_child_order(reqobj, wttime)
-                        break
+                        return
             except KeyError: 
                 self.log.error(u'未获取合约交易信息尝试三次以后子线程终止')
             finally:
@@ -99,18 +103,18 @@ class AlgoTrade(object):
                 if max_cancel_cnt == 0:
                     break
 
-
     def process_child(self, reqobj, wttime):
         """发单子线程
         @reqobj: 发单请求
         @wttime: 等待成交时间
         """
-        remain_v = 0
         reqobj.price = round(self.gateway.tickdata[reqobj.symbol].tolist()[-1].bidPrice1, 1)
-        order_ref = self.gateway.sendOrder(reqobj)
-        self.log.info('------------------------sendinfo-------------------')
+        self.log.info(CUTOFF%'READY FOR SENDORDER')
         self.log.info(json.dumps(reqobj.__dict__))
+        order_ref = self.gateway.sendOrder(reqobj)
+        self.log.info(CUTOFF%'SEND OVER WILL WAIT TRADED '+ str(wttime)+'S')
         time.sleep(wttime)
+        self.log.info(CUTOFF%'CALL CANCEL PROCESS (' + str(order_ref) + ')')
         self.process_cancel(reqobj, wttime, order_ref)  
         return
              
@@ -123,12 +127,11 @@ class AlgoTrade(object):
         其余参数和对外接口保持一致
         """
         volume = reqobj.volume
-        self.volume = volume
         if volume % size > 0:
             count = volume // size + 1
         else:
             count = volume // size
-
+        self.log.info(CUTOFF % 'TWAPMAIN VOLUME ANAD COUNT (' + str(volume) + ',' + str(count) + ')')
         for i in range(count):
             if i == count - 1:
                 reqobj.volume = (volume - i*size) 
@@ -138,15 +141,9 @@ class AlgoTrade(object):
                 self.send_child_order(reqobj, wttime)
             time.sleep(sinterval)
         self.pool.wait()
+        self.log.info(CUTOFF % 'TWAPMAIN WILL FINISH SEND ALL CHILDORDER WILL WAITED ' + str(mwtime - count * sinterval) + 'S')
         #最大等待时间
         time.sleep(mwtime - count * sinterval)
-        #剩余单数以对手价格下单
-        if self.volume > 0:
-            rb_data = self.gateway.tickdata[reqobj.symbol].tolist()[-1]
-            price = round(rb_data.askPrice1, 1)
-            reqobj.price = price
-            reqobj.volume = self.volume
-            self.gateway.sendOrder(reqobj)
         return
         
     def get_order_info_callback(self, event):
@@ -165,14 +162,14 @@ class AlgoTrade(object):
         self.orderinfo[tradeinfo.symbol][tradeinfo.orderID].status = STATUS_ALLTRADED
 
         #收到成交回报更新总单数
-        self.volume -= tradeinfo.volume
-        self.log.info('----------------------------success----------------')
-        self.log.info(self.volume)
+        self.log.info(CUTOFF % 'RECV TRADED INFO REMAIN VOLUME')
+        self.log.info(json.dumps(tradeinfo.__dict__))
         if 'tradeinfo' not in self.ret_client_data:
             self.ret_client_data['tradeinfo'] = list()
             self.ret_client_data['tradeinfo'].append(tradeinfo.__dict__)
         else:
             self.ret_client_data['tradeinfo'].append(tradeinfo.__dict__)
+        self.log.info(CUTOFF % 'ASSEMBLE RETURN CLIENT DATA')
 
     def register(self):
         self.eventengine.register(EVENT_TRADE, self.get_trade_info_callback)
