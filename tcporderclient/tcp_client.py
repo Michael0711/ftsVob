@@ -38,7 +38,7 @@ class FtsClientNetLib():
 
     def __connect(self):
         try:
-            sock = socket.create_connection((self.driver.ip, self.driver.port), self.driver.cntmout)
+            sock = socket.create_connection((self.driver.ip, self.driver.port))
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         except socket.error, why:
             print("driver connect error (%s), ip(%s), port(%d)", why, self.driver.ip , self.driver.port)
@@ -77,12 +77,10 @@ class FtsClientNetLib():
             #发送请求
             reqRawData = json.dumps(send_order)
             sent = 0
-            sock.settimeout(self.driver.wrtmout)
             while sent < len(reqRawData):
                 sent += sock.send(reqRawData)
 
             #接收回报
-            sock.settimeout(self.driver.rdtmout)
             recvRaw = sock.recv(1024)
             print(recvRaw)
             self.__put_socket(sock)
@@ -96,6 +94,9 @@ def main():
     driver = FtsTcpClient('order_client.json')
     driver.setRequest('order_list.json')
     driver.doRequest()
+    while True:
+        time.sleep(0.5)
+
 
 if __name__ == '__main__':
     main()

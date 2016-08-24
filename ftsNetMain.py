@@ -13,21 +13,20 @@ def send_order_call_back(ftsserver):
 
     #调用Algo下单
     algo = ftsVob.AlgoTrade(ftsserver.gateway, ftsserver.eventengine)
+    clientid = ftsserver.sendlist['clientid']
     for elt in ftsserver.sendlist:
-        #Algo相关参数提取
-        size = ftsserver.sendlist[elt]['size']
-        t1 = ftsserver.sendlist[elt]['sinterval']
-        t2 = ftsserver.sendlist[elt]['mwtime']
-        t3 = ftsserver.sendlist[elt]['wttime']
-        #转换下单对象
-        orderreq = convert_order2reqobj(ftsserver.sendlist[elt])
-        #这里需要转码utf-8
-        orderreq.symbol = elt.encode('utf-8')
-        algo.twap(size, orderreq, sinterval=t1, mwtime=t2, wttime=t3)
-
-    #等待最长时间获取返回
-    time.sleep(t2)
-    return json.dumps(algo.ret_client_data)
+        #Algo相关参数提取，忽略客户号
+        if elt != 'clientid':
+            size = ftsserver.sendlist[elt]['size']
+            t1 = ftsserver.sendlist[elt]['sinterval']
+            t2 = ftsserver.sendlist[elt]['mwtime']
+            t3 = ftsserver.sendlist[elt]['wttime']
+            #转换下单对象
+            orderreq = convert_order2reqobj(ftsserver.sendlist[elt])
+            #这里需要转码utf-8
+            orderreq.symbol = elt.encode('utf-8')
+            algo.twap(size, orderreq, sinterval=t1, mwtime=t2, wttime=t3, clientid=clientid)
+    return
     
 
 def convert_order2reqobj(elt):

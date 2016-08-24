@@ -4,6 +4,7 @@ import json
 import socket,threading,asyncore
 
 from ..logHandler import DefaultLogHandler
+from ..quantEngine.event_engine import *
 
 RECVDATASIZE = 1024
 
@@ -66,6 +67,7 @@ class FtsServerNetLib(asyncore.dispatcher):
         self.connections = []
         self.__lock = threading.Lock()
         self.log = DefaultLogHandler(name=__name__)
+        self.connmap = {}
 
     def start(self):
         self.create_socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -74,13 +76,13 @@ class FtsServerNetLib(asyncore.dispatcher):
         self.listen(self.server.queuesize)
         self.twork = []
         self.connections = []
+        self.register()
 
         self.is_running = True
         for i in range(self.server.threadnum):
             self.twork.append(threading.Thread(target = self.thread_work))
         for i in range(self.server.threadnum):
             self.twork[i].start()
-
         asyncore.loop(0.01)
 
     def stop(self):
@@ -91,6 +93,9 @@ class FtsServerNetLib(asyncore.dispatcher):
             self.del_channel()
             self.close()
 
+    def register(self):
+        self.server.eventengine.register(EVENT_CLIENT, self.send_msg_by_clientid)
+
     def thread_work(self):
         while self.is_running:
             conn = self.__get_conn()
@@ -99,12 +104,18 @@ class FtsServerNetLib(asyncore.dispatcher):
             try:
                 self.__lock.acquire()
                 sock,addr = conn
-
+                
+                self.log.info(conn)
                 #接收数据
                 #设置读取超时时间
                 sock.settimeout(self.server.rdtmout)
                 recvRaw = sock.recv(RECVDATASIZE)
+                self.log.info(recvRaw)
                 self.server.sendlist = json.loads(recvRaw)
+
+                #建立客户端映射
+                self.connmap[self.server.sendlist['clientid']] = conn
+                
 
                 #调用服务器的回调函数，这里可以设置TWAP函数
                 if self.server.callback:
@@ -116,15 +127,17 @@ class FtsServerNetLib(asyncore.dispatcher):
                 #返回客户端Resp数据，这里可以是TWAP的返回值
                 sock.settimeout(self.server.wrtmout)
                 #返回数据用Json格式，需要转成字符
-                sendRawData = json.dumps(rspdata)
+                sendRawData = ''
                 sent = 0
                 while sent < len(sendRawData):
                     sent += sock.send(sendRawData)
 
                 if self.server.conntype:
+                    self.log.info('euxyacg conntype:%d' % self.server.conntype)
                     self.__put_conn(conn)
                 else:
-                    conn[0].close()
+                    self.log.info('euxyacg conntype:%d' % self.server.conntype)
+                    #conn[0].close()
                 self.__lock.release()
             except socket.error, why:
                 self.__lock.release()
@@ -159,6 +172,21 @@ class FtsServerNetLib(asyncore.dispatcher):
         self.connections.append(conn)
         self.conncond.notify()
         self.conncond.release()
+
+    def send_msg_by_clientid(self, event):
+        """
+        事件回调函数发送回报消息给特定客户端
+        """
+        data = event.data
+        self.log.info(self.connmap[data.keys()[0]])
+        sock,addr = self.connmap[data.keys()[0]]
+        send = 0
+        msg = data.values()[0]
+        self.log.info('euxyacg')
+        self.log.info(msg)
+        while send < len(msg):
+            send += sock.send(msg)
+        
 
 def test_call_back(ftsserver):
     print('euxyacg')

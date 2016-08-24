@@ -10,6 +10,7 @@ from ..quantGateway.quant_constant import *
 from ..quantGateway.quant_gateway import *
 from ..logHandler import DefaultLogHandler
 from ..errorHandler import ErrorHandler
+from ..quantEngine.event_engine import *
 
 """
 GateWay的上层封装
@@ -45,22 +46,24 @@ class AlgoTrade(object):
         #返回给客户端数据(在网络交易模式下)
         self.ret_client_data = {}
 
-    def twap(self, size, reqobj, price=0, sinterval=1, mwtime=60, wttime=2):
+    def twap(self, size, reqobj, price=0, sinterval=1, mwtime=60, wttime=2, clientid=0):
         """TWAP对外接口
         @sinterval: 发单间隔时间，小单间隔
         @mwtime: 最长等待时间，主线程的最长等待时间
         @wttime: 等待成交时间，发单线程等待成交时间
+        @clientid: 客户端ID， 唯一性由客户端保证
         """
-        self.twap_thread = Thread(target=self.twap_callback, args=(size, reqobj, price, sinterval, mwtime, wttime))
+        self.twap_thread = Thread(target=self.twap_callback, args=(size, reqobj, price, sinterval, mwtime, wttime, clientid))
         self.twap_thread.start()
 
-    def vwap(self, size, reqobj, price=0, sinterval=1, mwtime=60, wttime=2):
+    def vwap(self, size, reqobj, price=0, sinterval=1, mwtime=60, wttime=2, clientid=0):
         """VWAP对外接口
         @sinterval: 发单间隔时间，小单间隔
         @mwtime: 最长等待时间，主线程的最长等待时间
         @wttime: 等待成交时间，发单线程等待成交时间
+        @clientid: 客户端ID，唯一性由客户端保证
         """
-        self.vwap_thread = Thread(target=self.vwap_callback, args=(size, reqobj, price, sinterval, mwtime, wttime))
+        self.vwap_thread = Thread(target=self.vwap_callback, args=(size, reqobj, price, sinterval, mwtime, wttime, clientid))
         self.vwap_thread.start()
 
     def send_child_order(self, reqobj, wttime): 
@@ -118,7 +121,7 @@ class AlgoTrade(object):
         self.process_cancel(reqobj, wttime, order_ref)  
         return
              
-    def twap_callback(self, size, reqobj, price, sinterval, mwtime, wttime):
+    def twap_callback(self, size, reqobj, price, sinterval, mwtime, wttime, clientid):
         """Time Weighted Average Price
         每次以线程模式调用
         @size: 小单规模
@@ -140,10 +143,13 @@ class AlgoTrade(object):
                 reqobj.volume = size
                 self.send_child_order(reqobj, wttime)
             time.sleep(sinterval)
-        self.pool.wait()
         self.log.info(CUTOFF % 'TWAPMAIN WILL FINISH SEND ALL CHILDORDER WILL WAITED ' + str(mwtime - count * sinterval) + 'S')
         #最大等待时间
         time.sleep(mwtime - count * sinterval)
+        #推送客户端回报消息
+        ret_msg = {clientid:json.dumps(self.ret_client_data)} 
+        event = Event(EVENT_CLIENT, data=ret_msg)
+        self.eventengine.put(event)
         return
         
     def get_order_info_callback(self, event):
@@ -179,6 +185,6 @@ class AlgoTrade(object):
     def log_handler(self):    
         return DefaultLogHandler(name=__name__)
 
-    def vwap_callback(self, size, reqobj, price, sinterval, mwtime, wttime):
+    def vwap_callback(self, size, reqobj, price, sinterval, mwtime, wttime, clientid):
         pass
         
