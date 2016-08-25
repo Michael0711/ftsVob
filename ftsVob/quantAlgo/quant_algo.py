@@ -145,11 +145,11 @@ class AlgoTrade(object):
                 self.send_child_order(reqobj, wttime)
             time.sleep(sinterval)
         self.log.info(CUTOFF % 'TWAPMAIN WILL FINISH SEND ALL CHILDORDER WILL WAITED ' + str(mwtime - count * sinterval) + 'S')
+        #最大等待时间
+        time.sleep(mwtime - count * sinterval)
         #结束线程池
         self.pool.dismissWorkers(self.thread_pool_size)
         self.pool.joinAllDismissedWorkers()
-        #最大等待时间
-        time.sleep(mwtime - count * sinterval)
         #推送客户端回报消息
         ret_msg = {clientid:json.dumps(self.ret_client_data)} 
         event = Event(EVENT_CLIENT, data=ret_msg)
