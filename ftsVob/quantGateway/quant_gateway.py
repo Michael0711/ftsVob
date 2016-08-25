@@ -37,15 +37,17 @@ class VtGateway(object):
     def onTrade(self, trade):
         """成交信息推送"""
         # 通用事件
-        # 特定合约的成交事件
-        pass
+        event = Event(event_type=EVENT_TRADE)
+        event.data = trade
+        self.eventEngine.put(event)
     
     #----------------------------------------------------------------------
     def onOrder(self, order):
         """订单变化推送"""
         # 通用事件
-        # 特定订单编号的事件
-        pass
+        event = Event(event_type=EVENT_ORDER)
+        event.data = order
+        self.eventEngine.put(event)
     
     #----------------------------------------------------------------------
     def onPosition(self, position):
@@ -246,15 +248,19 @@ class VtOrderData(VtBaseData):
         self.price = EMPTY_FLOAT                # 报单价格
         self.totalVolume = EMPTY_INT            # 报单总数量
         self.tradedVolume = EMPTY_INT           # 报单成交数量
+        self.remainVolume = EMPTY_INT           # 报单剩余数量
         self.status = EMPTY_UNICODE             # 报单状态
         
         self.orderTime = EMPTY_STRING           # 发单时间
         self.cancelTime = EMPTY_STRING          # 撤单时间
+        self.requestID = EMPTY_STRING           # 请求序号
         
         # CTP/LTS相关
         self.frontID = EMPTY_INT                # 前置机编号
         self.sessionID = EMPTY_INT              # 连接编号
 
+        
+       
 class VtTradeData(VtBaseData):
     """成交数据类"""
 
@@ -393,6 +399,7 @@ class RingBuffer(object):
             self.cur = 0
             #当队列满时将self的类从非满改为满
             self.__class__ = self.__Full
+
     def tolist(self):
         """ Return a list of elements from the oldest to the newest. """
         return self.data
